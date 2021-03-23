@@ -1,9 +1,7 @@
 """
 Advanced Algorithms HW3, Q3: Implement a 2-approximation algorithm for the metric TSP problem!
-
 The code is directly drawn from a very outstanding existing implementation:
 https://github.com/shiThomas/MST-TSP
-
 Hence, the answers are available at the GitHub link above!
 Please don't look at it unless you are absolutely stuck, even after hours!
 """
@@ -12,15 +10,16 @@ Please don't look at it unless you are absolutely stuck, even after hours!
 import math
 ################################################################################
 
+from itertools import permutations
+
+
 """
 Prim's Algorithm
 This Function builds a MST from the given map using the Prim's algorithm.
 This is provided! No need to change anything.
-
 Input:
 adjList: the list of all neighbors of all cities in the map
 adjMat: the 2D array representing the distance between two cities
-
 Output:
 This function has no output, it just changes the vertexes' attributes
 """
@@ -53,17 +52,23 @@ def prim(adjList, adjMat):
                     neigh.prev = v
     return
 
+def preorder(result,tree,index):
+    if (index < len(tree)):
+        result.append(tree[index])
+    if (index*2+1 < len(tree)):
+        return preorder(result,tree,index*2+1)
+    if (index*2+2 < len(tree)):
+        return preorder(result,tree,index*2+2)
+    return result
 ################################################################################
 
 """
 TSP
 Use a 2-approximation to get an approximate solution of the TSP problem.
-
 Input:
 adjList: the list of all neighbors of all cities in the map
 start: the city where we start our tour
 (see Map class for more information!)
-
 Output:
 A tour which is a cycle of cities.
 Its cost is at most twice the optimal solution
@@ -85,7 +90,6 @@ class Vertex:
 
     """
     Class attributes:
-
     rank    # The rank of this node.
     neigh   # The list of neighbors IN THE ORIGINAL GRAPH.
     mstN    # The list of neighbors IN THE MST.
@@ -140,14 +144,12 @@ class Edge:
 
     """
     Class attributes:
-
     vertices # The list of vertices for this edge.
     weight   # The weight of this edge.
     """
 
     """
     __init__ function to initialize the edge.
-
     INPUTS:
     vertex1 and vertex2: the vertices for the edge
     weight: the weight of the edge
@@ -197,7 +199,6 @@ class MinQueue:
 
     """
     __init__ function to initialize the edge.
-
     INPUTS:
     array: the input array to be inserted into the queue.
     """
@@ -252,7 +253,6 @@ class MinQueue:
 
 """
 Map Class
-
 TODO!!
 You need to complete the getTSPApprox() and getTSPOptimal() methods.
 Everything else is complete and provided for your convenience.
@@ -274,7 +274,6 @@ class Map:
 
     """
     __init__ function to initialize the map.
-
     INPUTS:
     mapNum: The number of the map to use.
     """
@@ -404,17 +403,59 @@ class Map:
                     self.mst.append(e)
         return
 
+    def DFS(self, v, visited):
+
+        # Current node is now visited
+        if v not in visited:
+            visited.append(v)
+            # print(v,visited,'yo')
+        # Recur for all the neighbors of v
+        for neighbour in v.mstN:
+            if neighbour not in visited:
+                self.DFS(neighbour, visited)
+
     """
     getTSPApprox: uses the MST to find the approximate solution to TSP.
     """
+
     def getTSPApprox(self):
-        if len(self.mst) > 0:
-            ### TODO ###
-            # Complete the TSP Approximation method here
-            # Update the Map object with the TSP Approximate tour
-        else:
-            raise Exception('No MST set!')
-        return
+        # 1) Let 1 be the starting and ending point for salesman.
+        # 2) Construct MST from with 1 as root using Prim’s Algorithm.
+        # 3) List vertices visited in preorder walk of the constructed MST and add 1 at the end.
+        # self.tour = preorder([],self.mst,0)
+        # self.tour.append(self.start)
+        # print(self.tour)
+
+        # print(self.mst[2].vertices)
+        # self.tour = self.mst
+        # print(self.tour)
+        # return self.tour
+        visited = []
+        self.DFS(self.start,visited)
+        visited.append(self.start)
+        self.tour = [i.rank for i in list(visited)]
+        sum = 0
+        for i in range(0,len(self.tour)):
+            if self.tour[i] != self.tour[-1] or i == 0:
+                sum += self.adjMat[self.tour[i]][self.tour[i+1]]
+        # print(sum, self.tour,'2-approx')
+
+    def is_valid(self, lst):
+        weight = 0
+        lst.append(self.start)
+        prev = lst[0]
+
+        for i in lst[1:]:
+            result = False
+            for edge in self.edgeList:
+                if i in edge.vertices and prev in edge.vertices:
+                    weight += edge.weight
+                    prev = i
+                    result = True
+                    break
+            if result == False:
+                return False, math.inf
+        return result, weight
 
     """
     getTSPOptimal: brute-force approach to finding the optimal tour.
@@ -423,8 +464,32 @@ class Map:
         ### TODO ###
         # Complete a brute-force TSP solution!
         # Replace the following two lines with an actual implementation.
-        self.tourOpt = getMap(self.mapNum)[3]
-        return None
+        not_start = [i for i in self.adjList if i != self.start]
+        next_permuation = list(permutations(not_start))
+        # find first valid permutation
+        current_pathweight = 0
+        min_path = []
+        for p in next_permuation:
+            perm = [self.start]
+            perm.extend(list(p))
+            # check if p is valid, we find the current path weight
+            valid, weight = self.is_valid(perm)
+            if valid:
+                current_pathweight = weight
+                min_path = perm
+                break
+
+        for p in next_permuation:
+            perm = [self.start]
+            perm.extend(list(p))
+            # check if p is valid, we find the current path weight
+            valid, weight = self.is_valid(perm)
+            if valid:
+                if weight < current_pathweight:
+                    current_pathweight = weight
+                    min_path = perm
+        # print([i.rank for i in min_path], current_pathweight,'optimal')
+        self.tourOpt = [i.rank for i in min_path]
 
     """
     clearMap: this function will reset the MST and tour for the map, along with
@@ -468,12 +533,9 @@ class Map:
 
 """
 getMap
-
 This function will return the adjacency matrix and city names for the map.
-
 INPUTS
 mapNum: the number of which map to select.
-
 OUTPUTS
 adjMat:   the adjacency matrix.
 cityList: the list of the cities.
@@ -624,14 +686,11 @@ def getMap(mapNum=0):
 
 """
 getDist
-
 This function takes in two coordinates and returns the distance between them
 (in kilometers).
-
 INPUTS
 lat1, long1: the latitude and longitude of the first city.
 lat2, long2: the latitude and longitude of the second city.
-
 OUTPUTS
 dist: the distance between the two cities (km).
 """
@@ -667,12 +726,9 @@ def getDist(lat1,long1,lat2,long2):
 
 """
 testMSTApprox
-
 This function will test your code on the various maps using the input alg.
-
 INPUTS
 alg: 'Prim' or 'Kruskal'
-
 OUTPUTS
 s: a string indicating number of tests passed.
 """
@@ -681,6 +737,8 @@ def testMSTApprox():
     Tpass = 0
     Mflag = False
     Tflag = False
+    flag_left = False
+    flag_right = False
     t = 9
     tol = 1e-6
 
@@ -778,12 +836,9 @@ def testMSTApprox():
 
 """
 test2approx
-
 This function will test your code on the various maps using the input alg.
-
 INPUTS
 None.
-
 OUTPUTS
 s: a string indicating number of tests passed.
 """
